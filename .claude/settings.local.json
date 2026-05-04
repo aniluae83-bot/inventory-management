@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Start-Process \"http://localhost:8001/docs\")",
+      "PowerShell(for \\($i = 1; $i -le 8; $i++\\) { Start-Sleep -Seconds 2; try { $response = Invoke-WebRequest -Uri \"http://localhost:8001/api/restocking-orders\" -ErrorAction Stop -TimeoutSec 2; Write-Host \"✓ Backend restarted successfully!\"; Write-Host \"✓ Restocking API is responding\"; $data = $response.Content | ConvertFrom-Json; Write-Host \"✓ Current restocking orders: $\\($data.Count\\)\"; break } catch { Write-Host \"Checking backend startup... attempt $i\" } })",
+      "PowerShell(try { $response = Invoke-WebRequest -Uri \"http://localhost:8001/\" -ErrorAction Stop; Write-Host \"Backend is running\"; $response.StatusCode } catch { Write-Host \"Backend error: $_\" })",
+      "PowerShell(Start-Process \"http://localhost:3000/restocking\")",
+      "Bash(curl -s -X POST http://localhost:8001/api/restocking-orders -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(curl -s http://localhost:8001/api/restocking-orders)",
+      "Bash(curl -s \"http://localhost:8001/api/orders?status=Submitted\")",
+      "Bash(curl -s \"http://localhost:8001/api/orders\")",
+      "PowerShell(Start-Process \"http://localhost:3000\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(findstr :8001)",
+      "Bash(npx playwright *)",
+      "Bash(curl -s http://localhost:8001/api/dashboard/summary)",
+      "PowerShell(claude mcp *)",
+      "PowerShell(python --version)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3000)",
+      "WebFetch(domain:localhost)",
+      "Bash(curl -s http://localhost:8001/docs)",
+      "Bash(curl -s http://localhost:8001/api/inventory)",
+      "Bash(curl -s http://localhost:8001/api/orders)"
+    ]
+  }
+}
