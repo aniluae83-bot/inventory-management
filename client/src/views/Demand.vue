@@ -14,16 +14,16 @@
             <div class="trend-icon">↑</div>
             <div>
               <div class="trend-label">{{ t('demand.increasingDemand') }}</div>
-              <div class="trend-count">{{ t('demand.itemsCount', { count: getForecastsByTrend('increasing').length }) }}</div>
+              <div class="trend-count">{{ t('demand.itemsCount', { count: increasingForecasts.length }) }}</div>
             </div>
           </div>
           <div class="trend-items">
-            <div v-for="item in getForecastsByTrend('increasing').slice(0, 5)" :key="item.id" class="trend-item">
+            <div v-for="item in increasingForecasts.slice(0, 5)" :key="item.id" class="trend-item">
               <span class="item-name">{{ item.item_name }}</span>
               <span class="item-change">+{{ getChangePercent(item) }}%</span>
             </div>
-            <div v-if="getForecastsByTrend('increasing').length > 5" class="more-items">
-              +{{ getForecastsByTrend('increasing').length - 5 }} {{ t('demand.more') }}
+            <div v-if="increasingForecasts.length > 5" class="more-items">
+              +{{ increasingForecasts.length - 5 }} {{ t('demand.more') }}
             </div>
           </div>
         </div>
@@ -33,16 +33,16 @@
             <div class="trend-icon">→</div>
             <div>
               <div class="trend-label">{{ t('demand.stableDemand') }}</div>
-              <div class="trend-count">{{ t('demand.itemsCount', { count: getForecastsByTrend('stable').length }) }}</div>
+              <div class="trend-count">{{ t('demand.itemsCount', { count: stableForecasts.length }) }}</div>
             </div>
           </div>
           <div class="trend-items">
-            <div v-for="item in getForecastsByTrend('stable').slice(0, 5)" :key="item.id" class="trend-item">
+            <div v-for="item in stableForecasts.slice(0, 5)" :key="item.id" class="trend-item">
               <span class="item-name">{{ item.item_name }}</span>
               <span class="item-change neutral">{{ getChangePercent(item) }}%</span>
             </div>
-            <div v-if="getForecastsByTrend('stable').length > 5" class="more-items">
-              +{{ getForecastsByTrend('stable').length - 5 }} {{ t('demand.more') }}
+            <div v-if="stableForecasts.length > 5" class="more-items">
+              +{{ stableForecasts.length - 5 }} {{ t('demand.more') }}
             </div>
           </div>
         </div>
@@ -52,16 +52,16 @@
             <div class="trend-icon">↓</div>
             <div>
               <div class="trend-label">{{ t('demand.decreasingDemand') }}</div>
-              <div class="trend-count">{{ t('demand.itemsCount', { count: getForecastsByTrend('decreasing').length }) }}</div>
+              <div class="trend-count">{{ t('demand.itemsCount', { count: decreasingForecasts.length }) }}</div>
             </div>
           </div>
           <div class="trend-items">
-            <div v-for="item in getForecastsByTrend('decreasing').slice(0, 5)" :key="item.id" class="trend-item">
+            <div v-for="item in decreasingForecasts.slice(0, 5)" :key="item.id" class="trend-item">
               <span class="item-name">{{ item.item_name }}</span>
               <span class="item-change">{{ getChangePercent(item) }}%</span>
             </div>
-            <div v-if="getForecastsByTrend('decreasing').length > 5" class="more-items">
-              +{{ getForecastsByTrend('decreasing').length - 5 }} {{ t('demand.more') }}
+            <div v-if="decreasingForecasts.length > 5" class="more-items">
+              +{{ decreasingForecasts.length - 5 }} {{ t('demand.more') }}
             </div>
           </div>
         </div>
@@ -139,6 +139,10 @@ export default {
       return allForecasts.value.filter(f => validSkus.has(f.item_sku))
     })
 
+    const increasingForecasts = computed(() => forecasts.value.filter(f => f.trend === 'increasing'))
+    const stableForecasts     = computed(() => forecasts.value.filter(f => f.trend === 'stable'))
+    const decreasingForecasts = computed(() => forecasts.value.filter(f => f.trend === 'decreasing'))
+
     const loadForecasts = async () => {
       try {
         loading.value = true
@@ -165,10 +169,6 @@ export default {
     watch([selectedLocation, selectedCategory], () => {
       loadForecasts()
     })
-
-    const getForecastsByTrend = (trend) => {
-      return forecasts.value.filter(f => f.trend === trend)
-    }
 
     const getChangePercent = (forecast) => {
       const change = ((forecast.forecasted_demand - forecast.current_demand) / forecast.current_demand * 100).toFixed(1)
@@ -214,7 +214,9 @@ export default {
       loading,
       error,
       forecasts,
-      getForecastsByTrend,
+      increasingForecasts,
+      stableForecasts,
+      decreasingForecasts,
       getChangePercent,
       getChangeColor,
       translatePeriod

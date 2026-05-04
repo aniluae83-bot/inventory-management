@@ -143,6 +143,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '../api'
 import { useI18n } from '../composables/useI18n'
+import { formatCurrency as formatCurrencyUtil } from '../utils/currency'
 
 const FALLBACK_UNIT_COST = 50
 
@@ -161,17 +162,7 @@ export default {
     const demandForecasts = ref([])
     const inventoryItems = ref([])
 
-    // ── Currency formatting ───────────────────────────────────────────────────
-    const formatCurrency = (value) => {
-      const symbol = currentCurrency.value === 'JPY' ? '¥' : '$'
-      if (currentCurrency.value === 'JPY') {
-        return symbol + Math.round(value).toLocaleString()
-      }
-      return symbol + value.toLocaleString('en-US', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      })
-    }
+    const formatCurrency = (value) => formatCurrencyUtil(value, currentCurrency.value)
 
     // ── Recommendation algorithm ──────────────────────────────────────────────
     const recommendations = computed(() => {

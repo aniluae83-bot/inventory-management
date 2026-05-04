@@ -16,6 +16,8 @@ const currentCurrency = computed(() => {
   return currentLocale.value === 'ja' ? 'JPY' : 'USD'
 })
 
+const currencySymbol = computed(() => currentLocale.value === 'ja' ? '¥' : '$')
+
 export function useI18n() {
   const t = (key, params = {}) => {
     const keys = key.split('.')
@@ -90,6 +92,17 @@ export function useI18n() {
     return customerName
   }
 
+  const translateCategory = (category) => {
+    const map = {
+      'Circuit Boards': t('categories.circuitBoards'),
+      'Sensors': t('categories.sensors'),
+      'Actuators': t('categories.actuators'),
+      'Controllers': t('categories.controllers'),
+      'Power Supplies': t('categories.powerSupplies')
+    }
+    return map[category] || category
+  }
+
   // Translate warehouse names
   const translateWarehouse = (warehouseName) => {
     if (currentLocale.value === 'ja') {
@@ -119,10 +132,12 @@ export function useI18n() {
     setLocale,
     currentLocale: computed(() => currentLocale.value),
     currentCurrency,
+    currencySymbol,
     availableLocales,
     localeName,
     translateProductName,
     translateCustomerName,
-    translateWarehouse
+    translateWarehouse,
+    translateCategory
   }
 }

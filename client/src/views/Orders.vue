@@ -11,19 +11,19 @@
       <div class="stats-grid">
         <div class="stat-card success">
           <div class="stat-label">{{ t('status.delivered') }}</div>
-          <div class="stat-value">{{ getOrdersByStatus('Delivered').length }}</div>
+          <div class="stat-value">{{ deliveredOrders.length }}</div>
         </div>
         <div class="stat-card info">
           <div class="stat-label">{{ t('status.shipped') }}</div>
-          <div class="stat-value">{{ getOrdersByStatus('Shipped').length }}</div>
+          <div class="stat-value">{{ shippedOrders.length }}</div>
         </div>
         <div class="stat-card warning">
           <div class="stat-label">{{ t('status.processing') }}</div>
-          <div class="stat-value">{{ getOrdersByStatus('Processing').length }}</div>
+          <div class="stat-value">{{ processingOrders.length }}</div>
         </div>
         <div class="stat-card danger">
           <div class="stat-label">{{ t('status.backordered') }}</div>
-          <div class="stat-value">{{ getOrdersByStatus('Backordered').length }}</div>
+          <div class="stat-value">{{ backorderedOrders.length }}</div>
         </div>
       </div>
 
@@ -131,11 +131,7 @@ import { useI18n } from '../composables/useI18n'
 export default {
   name: 'Orders',
   setup() {
-    const { t, currentCurrency, translateProductName, translateCustomerName } = useI18n()
-
-    const currencySymbol = computed(() => {
-      return currentCurrency.value === 'JPY' ? '¥' : '$'
-    })
+    const { t, translateProductName, translateCustomerName, currencySymbol } = useI18n()
     const loading = ref(true)
     const error = ref(null)
     const orders = ref([])
@@ -149,6 +145,11 @@ export default {
       selectedStatus,
       getCurrentFilters
     } = useFilters()
+
+    const deliveredOrders   = computed(() => orders.value.filter(o => o.status === 'Delivered'))
+    const shippedOrders     = computed(() => orders.value.filter(o => o.status === 'Shipped'))
+    const processingOrders  = computed(() => orders.value.filter(o => o.status === 'Processing'))
+    const backorderedOrders = computed(() => orders.value.filter(o => o.status === 'Backordered'))
 
     const loadOrders = async () => {
       try {
@@ -182,10 +183,6 @@ export default {
       loadOrders()
     })
 
-    const getOrdersByStatus = (status) => {
-      return orders.value.filter(order => order.status === status)
-    }
-
     const getOrderStatusClass = (status) => {
       const statusMap = {
         'Delivered': 'success',
@@ -217,7 +214,10 @@ export default {
       error,
       orders,
       restockingOrders,
-      getOrdersByStatus,
+      deliveredOrders,
+      shippedOrders,
+      processingOrders,
+      backorderedOrders,
       getOrderStatusClass,
       formatDate,
       currencySymbol,
