@@ -122,5 +122,21 @@ const params=new URLSearchParams()
 }
     const response=await axios.get(`${API_BASE_URL}/suppliers?`+params.toString())
     return response.data
+  },
+
+  async getQuarterlyReports(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.warehouse && filters.warehouse !== 'all') params.append('warehouse', filters.warehouse)
+    if (filters.month && filters.month !== 'all') params.append('month', filters.month)
+    const response = await axios.get(`${API_BASE_URL}/reports/quarterly?${params.toString()}`)
+    return response.data
+  },
+
+  async getMonthlyTrends(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.warehouse && filters.warehouse !== 'all') params.append('warehouse', filters.warehouse)
+    if (filters.month && filters.month !== 'all') params.append('month', filters.month)
+    const response = await axios.get(`${API_BASE_URL}/reports/monthly-trends?${params.toString()}`)
+    return response.data
   }
 }
