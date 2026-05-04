@@ -11,6 +11,17 @@
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">{{ t('inventory.stockLevels') }} ({{ filteredItems.length }} {{ t('inventory.skus') }})</h3>
+          <div class="header-actions">
+          <button @click="exportToCSV" class="export-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fill-rule="evenodd"
+                d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            Export CSV
+          </button>
           <div class="search-box">
             <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
@@ -31,6 +42,7 @@
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
               </svg>
             </button>
+          </div>
           </div>
         </div>
         <div class="table-container">
@@ -186,6 +198,43 @@ export default {
       showItemModal.value = true
     }
 
+    const exportToCSV = () => {
+      const headers = [
+        'SKU',
+        'Item Name',
+        'Category',
+        'Quantity on Hand',
+        'Reorder Point',
+        'Unit Cost',
+        'Total Value',
+        'Location',
+        'Status',
+      ]
+      const rows = filteredItems.value.map((item) => [
+        item.sku,
+        item.name,
+        item.category,
+        item.quantity_on_hand,
+        item.reorder_point,
+        item.unit_cost.toFixed(2),
+        (item.quantity_on_hand * item.unit_cost).toFixed(2),
+        item.location,
+        getStockStatusKey(item),
+      ])
+
+      const csv = [headers, ...rows]
+        .map((row) => row.map((f) => `"${String(f).replace(/"/g, '""')}"`).join(','))
+        .join('\n')
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'inventory.csv'
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+
     onMounted(loadInventory)
 
     return {
@@ -203,7 +252,8 @@ export default {
       showItemDetail,
       currencySymbol,
       translateProductName,
-      translateWarehouse
+      translateWarehouse,
+      exportToCSV,
     }
   }
 }
@@ -237,6 +287,39 @@ export default {
   font-weight: 600;
   color: #0f172a;
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.export-btn:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+.export-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .search-box {
