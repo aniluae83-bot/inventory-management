@@ -96,11 +96,7 @@ export default {
     InventoryDetailModal
   },
   setup() {
-    const { t, currentCurrency, translateProductName, translateWarehouse } = useI18n()
-
-    const currencySymbol = computed(() => {
-      return currentCurrency.value === 'JPY' ? '¥' : '$'
-    })
+    const { t, translateProductName, translateWarehouse, translateCategory, currencySymbol } = useI18n()
 
     const loading = ref(true)
     const error = ref(null)
@@ -183,17 +179,6 @@ export default {
       } else {
         return 'success'
       }
-    }
-
-    const translateCategory = (category) => {
-      const categoryMap = {
-        'Circuit Boards': t('categories.circuitBoards'),
-        'Sensors': t('categories.sensors'),
-        'Actuators': t('categories.actuators'),
-        'Controllers': t('categories.controllers'),
-        'Power Supplies': t('categories.powerSupplies')
-      }
-      return categoryMap[category] || category
     }
 
     const showItemDetail = (item) => {
