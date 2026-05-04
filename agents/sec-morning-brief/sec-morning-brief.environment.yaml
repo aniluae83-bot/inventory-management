@@ -1,0 +1,6 @@
+name: sec-morning-brief-env
+description: Unrestricted network access for SEC EDGAR and news sources
+config:
+  type: cloud
+  networking:
+    type: unrestricted
