@@ -388,3 +388,29 @@ Compliance is weighted heaviest because the cost of a false negative — a misse
 *Expected behavior:* Multi-workstream risk trigger fires (≥ 3 workstreams at `high`). Coordinator escalates regardless of individual confidence scores.
 
 *Failure mode discovered:* Coordinator evaluated each specialist output independently, found all confidence scores above floor, and proceeded to route to the highest-priority workstream. The multi-workstream trigger was not evaluated as a distinct step — it was buried in the coordinator prompt as a guideline rather than enforced as a pre-routing check. Fix: multi-workstream risk check moved to an explicit conditional evaluated before any `route_to_workstream` call, implemented in the tool dispatch layer rather than relying on the model to apply it from prompt instructions.
+
+---
+
+## The Loop
+
+Human overrides are not discarded — they are the most valuable signal we have.
+
+Every time a compliance officer overrides an escalation or corrects a routing decision, the underlying intake case (anonymized and stripped of deal-identifying detail) is added to the adversarial evaluation harness with the human decision as the labeled ground truth. This is how the test suite grows: not from synthetic case generation, but from production failures.
+
+**How it works in practice:**
+
+1. Compliance officer receives an escalation packet and makes a decision (approve, override, or redirect).
+2. The escalation portal prompts for a structured override record: override reason (from a fixed taxonomy), the specialist that triggered escalation, and whether the final decision agreed with or contradicted the agent's recommendation.
+3. The override record is written to `audit.log` with `human_override: true` and a structured `override_category` field.
+4. Monthly, the Deal Technology Risk function reviews override records and identifies cases where: (a) the agent escalated unnecessarily (false positive — overhead), or (b) the agent's recommendation was wrong in a way that matters (false confidence — safety risk). Category (b) is prioritized.
+5. Category (b) cases are turned into adversarial eval cases, added to `tests/adversarial_evals.py`, and run against the current system before the next prompt revision ships. A prompt revision that fails any human-override-derived test case does not ship.
+
+**What this prevents:**
+
+The biggest risk in a deployed agent system is not the failures you catch in testing — it is the pattern of failures that emerges slowly across hundreds of real cases that no individual reviewer connects into a signal. The loop makes that pattern visible before it becomes a liability.
+
+**False-confidence rate as the leading metric:**
+
+The metric that matters most is not overall accuracy but **false-confidence rate**: the proportion of cases where a specialist returned confidence ≥ 0.65 (the auto-route floor) but a compliance officer subsequently overrode the routing decision. We track this per-workstream and per-deal-category. A rising false-confidence rate on a specific workstream is an early warning that the specialist prompt needs revision — before a mis-routed high-stakes deal produces a real consequence.
+
+Target: false-confidence rate below 8% per workstream before production deployment. Current baseline: Compliance agent at ~11% on partial sanctions matches — the primary driver of the six prompt revisions described in the Claude Code section.
