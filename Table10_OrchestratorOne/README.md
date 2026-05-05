@@ -273,6 +273,8 @@ OrchestratorOne/
 
 ## Results
 
+*Projected targets based on analysis of current manual process — not measured production outcomes.*
+
 | Metric | Before | After |
 |--------|--------|-------|
 | Avg intake triage time | 4.2 hours | 8 minutes |

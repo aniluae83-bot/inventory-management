@@ -30,6 +30,7 @@ from typing import Any, Callable
 
 import anthropic
 from pydantic import BaseModel, Field
+from hooks.pre_tool_use import pre_tool_use_hook
 
 
 # ---------------------------------------------------------------------------
@@ -225,36 +226,11 @@ def _hash(content: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
-# PreToolUse hooks — evaluated against source intake, not model-generated fields
+# PreToolUse hooks — imported from hooks/pre_tool_use.py
+# All three blocking rules (materiality, sanctions_hit, sanctions_check_materiality)
+# live there. No policy logic duplicated here.
 # ---------------------------------------------------------------------------
-
-def pre_tool_use_hook(
-    tool_name: str,
-    tool_input: dict,
-    intake: IntakeRequest,
-) -> dict | None:
-    """
-    Returns a block record if the tool call is prohibited, else None.
-
-    Context is derived from the validated IntakeRequest, not from coordinator output.
-    An agent cannot influence this evaluation by generating a field value.
-    """
-    if tool_name == "route_to_workstream":
-        if intake.deal_value_usd >= MATERIALITY_THRESHOLD_USD:
-            return {
-                "blocked": True,
-                "reason": (
-                    f"Deal value ${intake.deal_value_usd:,.0f} meets or exceeds the "
-                    f"${MATERIALITY_THRESHOLD_USD:,.0f} materiality threshold. "
-                    "Senior partner sign-off is required before routing. "
-                    "This block cannot be bypassed by model reasoning."
-                ),
-                "action_required": (
-                    "Obtain named senior partner approval via the escalation portal. "
-                    "Resubmit with a human_override token once approval is recorded."
-                ),
-            }
-    return None
+# pre_tool_use_hook is imported at the top of this file from hooks.pre_tool_use
 
 
 # ---------------------------------------------------------------------------
@@ -327,7 +303,7 @@ def dispatch_tool(
             "timestamp": ts.isoformat(),
         }
 
-    return {"error": f"Unknown tool: {tool_name}"}
+    return {"is_error": True, "reason_code": "unknown_tool", "guidance": f"Unknown tool: {tool_name}"}
 
 
 # ---------------------------------------------------------------------------
@@ -361,6 +337,10 @@ def run_coordinator(intake: IntakeRequest, verbose: bool = False) -> dict:
     ]
 
     turn_count = 0
+    # Evaluated by hooks against source deal data — never set from model-generated fields.
+    # Full implementation: coordinator sets sanctions_hits_found=True after Compliance specialist
+    # returns a WorkstreamAnalysis with a confirmed sanctions hit; hook then blocks route_to_workstream.
+    session_ctx: dict = {"sanctions_hits_found": False, "human_override_token": None}
     routing_results: list[dict] = []
     escalation_results: list[dict] = []
     reasoning_chain: list[dict] = []
@@ -489,7 +469,7 @@ def run_coordinator(intake: IntakeRequest, verbose: bool = False) -> dict:
                 tool_use_id = block.id
 
                 # ── PreToolUse hook check ───────────────────────────────────
-                hook_result = pre_tool_use_hook(tool_name, tool_input, intake)
+                hook_result = pre_tool_use_hook(tool_name, tool_input, intake.deal_value_usd, session_ctx)
 
                 if hook_result and hook_result.get("blocked"):
                     _audit({
@@ -566,6 +546,7 @@ def run_coordinator(intake: IntakeRequest, verbose: bool = False) -> dict:
                         "type": "tool_result",
                         "tool_use_id": tool_use_id,
                         "content": json.dumps(result),
+                        **({"is_error": True} if result.get("is_error") else {}),
                     })
 
             # Append assistant turn and tool results for next iteration.

@@ -1,0 +1,68 @@
+# OrchestratorOne — Policy Configuration
+# All thresholds here. No magic numbers in code.
+# Changes to any threshold require: sign-off from Compliance Officer + General Counsel,
+# simultaneous update to docs/mandate.md and hooks/pre_tool_use.py,
+# and a regression run of tests/adversarial_evals.py --live before deployment.
+
+model: claude-sonnet-4-6
+audit_log: ./audit.log
+max_validation_retries: 3
+
+# ── Materiality thresholds ────────────────────────────────────────────────────
+# Source: firm's internal approval matrix for material deal commitments.
+# OrchestratorOne inherited these; it did not set them.
+materiality:
+  auto_route_ceiling_usd: 100_000_000         # below this: route autonomously with appropriate priority
+  intermediate_floor_usd: 100_000_000         # $100M–$499M: route + flag for next-day partner review
+  senior_approval_floor_usd: 500_000_000      # >= this: PreToolUse block, escalate to senior partner
+  range_clause_policy: use_upper_bound        # when value is a range or has adjustment clauses
+  indeterminate_value_policy: escalate        # when upper bound cannot be determined
+
+# ── Sanctions ─────────────────────────────────────────────────────────────────
+# Calibrated against OFAC name-matching guidance.
+sanctions:
+  similarity_floor: 0.72                      # partial name match threshold for escalation
+  lists: [OFAC-SDN, EU-Consolidated, UN-Security-Council]
+  skip_on_legal_suffix: false                 # GmbH, OOO, LLC etc do NOT establish entity distinctness
+
+# ── Specialist confidence ─────────────────────────────────────────────────────
+specialists:
+  confidence_floor: 0.65                      # below this, specialist returns inconclusive; coordinator escalates
+  max_turns: 5                                # max turns per specialist before returning inconclusive
+
+# ── Coordinator loop ──────────────────────────────────────────────────────────
+coordinator:
+  max_turns: 8                                # hard loop limit before auto-escalation
+  max_tokens: 4096
+
+# ── Multi-workstream risk trigger ─────────────────────────────────────────────
+risk:
+  multi_workstream_trigger_count: 3           # >= this many workstreams at high/critical → escalate regardless
+  multi_workstream_levels: [high, critical]
+
+# ── Escalation routing ────────────────────────────────────────────────────────
+escalation:
+  recipients:
+    - compliance-officer@firm.com
+    - deal-counsel@firm.com
+  expected_response_hours: 2
+  channels: [email, slack]
+
+# ── Threshold history ─────────────────────────────────────────────────────────
+# Update this block whenever a threshold is changed.
+history:
+  - date: 2026-05-04
+    parameter: materiality.senior_approval_floor_usd
+    old_value: null
+    new_value: 500_000_000
+    approver: Compliance Officer
+  - date: 2026-05-04
+    parameter: sanctions.similarity_floor
+    old_value: null
+    new_value: 0.72
+    approver: Compliance Officer
+  - date: 2026-05-04
+    parameter: specialists.confidence_floor
+    old_value: null
+    new_value: 0.65
+    approver: Deal Technology Risk
