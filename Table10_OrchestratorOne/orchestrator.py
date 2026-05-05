@@ -91,6 +91,40 @@ class RoutingContext(BaseModel):
 
 COORDINATOR_TOOLS = [
     {
+        "name": "knowledge_lookup",
+        "description": (
+            "Retrieves current regulatory and jurisdictional reference data to ground "
+            "the coordinator's analysis in authoritative, up-to-date information. "
+            "Use before routing when: deal involves an unfamiliar jurisdiction, "
+            "merger control thresholds need verification, or FATF list status is uncertain. "
+            "Read-only. Results are session-scoped and do not persist to the audit log."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query_type": {
+                    "type": "string",
+                    "enum": [
+                        "fatf_jurisdiction_status",
+                        "merger_control_threshold",
+                        "ofac_designation_date",
+                        "treaty_network",
+                    ],
+                    "description": "Category of regulatory reference data to retrieve.",
+                },
+                "jurisdiction": {
+                    "type": "string",
+                    "description": "ISO 3166-1 alpha-2 country code for the query.",
+                },
+                "context": {
+                    "type": "string",
+                    "description": "Additional context to narrow the lookup (e.g. deal value for merger control).",
+                },
+            },
+            "required": ["query_type", "jurisdiction"],
+        },
+    },
+    {
         "name": "classify_intake",
         "description": (
             "Classifies an M&A intake request to determine which workstreams apply "
@@ -254,6 +288,17 @@ def dispatch_tool(
     Executes tool calls and returns structured results.
     In production: each branch calls a real external service or internal API.
     """
+    if tool_name == "knowledge_lookup":
+        # Stub: production calls FATF, OFAC, and merger-control reference APIs
+        query_type = tool_input.get("query_type")
+        jurisdiction = tool_input.get("jurisdiction", "")
+        if query_type == "fatf_jurisdiction_status":
+            grey = {"NG", "AE", "PH", "ZA", "JO", "AL", "BB", "BF", "KH", "HT", "MZ", "PK", "PA", "SN", "SY", "TZ", "TT", "YE", "VU"}
+            black = {"KP", "IR", "MM"}
+            status = "black-list" if jurisdiction in black else ("grey-list" if jurisdiction in grey else "not-listed")
+            return {"jurisdiction": jurisdiction, "fatf_status": status, "source": "FATF Public Statement", "as_of": "2026-02-01"}
+        return {"jurisdiction": jurisdiction, "query_type": query_type, "result": "stub — production queries live regulatory API"}
+
     if tool_name == "classify_intake":
         # Stub: real implementation calls document classification service
         countries = intake.counterparty_countries

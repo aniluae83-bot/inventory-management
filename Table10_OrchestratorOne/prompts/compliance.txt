@@ -1,0 +1,107 @@
+# Compliance Specialist — Annotated Context Pass
+#
+# This file shows exactly what the coordinator passes to the Compliance specialist.
+# Every field is documented with its source, why it's included, and what's deliberately excluded.
+#
+# Format: what the coordinator constructs before spawning run_compliance_specialist()
+
+# ── SYSTEM PROMPT (set once, never modified per-turn) ─────────────────────────
+#
+# Source: COMPLIANCE_SYSTEM constant in agents/compliance_agent.py
+# Why fixed: specialists must not receive coordinator reasoning or cross-domain findings.
+#            System prompt is the only instruction channel the specialist sees.
+#
+# Key constraints encoded in the system prompt:
+#   - Authority boundary: "Compliance analysis only. Do not advise on Tax, Legal, Financial, HR, or Technology."
+#   - Mandatory tool call: "Call check_sanctions for EVERY named counterparty — no exceptions."
+#   - Legal suffix rule: "GmbH, OOO, LLC does NOT establish entity distinctness."
+#   - FATF jurisdiction list: hardcoded grey/black-list country codes (not retrieved at runtime).
+#   - Confidence floor: "If confidence would fall below 0.65, return risk_level=high and flag inconclusive."
+#
+# What is NOT in the system prompt:
+#   - Deal value (sourced from IntakeRequest directly — specialist cannot influence materiality decisions)
+#   - Other specialists' findings (context isolation prevents cross-workstream contamination)
+#   - Routing history or prior coordinator turns
+
+# ── FIRST USER MESSAGE (constructed by coordinator per intake) ────────────────
+#
+# Source: run_compliance_specialist() in agents/compliance_agent.py, lines 148–163
+# Why this structure: minimal deal metadata + raw document text as opaque content.
+#                     Specialist receives the document but cannot influence coordinator state.
+
+"""
+Compliance review required for:
+
+Deal ID: {intake.deal_id}
+Target: {intake.target_name}
+Counterparty Countries: {', '.join(intake.counterparty_countries)}
+Document Type: {intake.document_type}
+
+Document Text:
+{intake.document_text}
+
+Complete your compliance analysis: classify the document to extract named entities,
+run sanctions screening on all identified counterparties, assess FATF jurisdiction
+exposure, and return your structured WorkstreamAnalysis.
+"""
+
+# Field-by-field rationale:
+#
+# deal_id          — audit trail correlation only; specialist cannot use it to route or escalate
+# target_name      — included so specialist can cross-reference against document entity list
+# counterparty_countries — ISO codes passed so classify_document stub can use them;
+#                          in production, specialist extracts these from the document itself
+# document_type    — informs classify_document (term_sheet vs financial_model vs entity_chart
+#                    have different entity extraction heuristics)
+# document_text    — passed as a single opaque string. Coordinator never parses or summarizes it.
+#                    "Documents travel as-is to prevent information loss." (mandate.md)
+#
+# NOT passed to specialist:
+#   deal_value_usd    — materiality decisions are coordinator + hook layer only
+#   acquirer_name     — not needed for sanctions screening (screening is counterparty-side)
+#   session_ctx       — specialist cannot read or write sanctions_hits_found;
+#                       coordinator updates session_ctx from specialist's returned WorkstreamAnalysis
+#   other specialists' WorkstreamAnalysis results — context isolation by design (see ADR-001)
+
+# ── TOOLS AVAILABLE TO COMPLIANCE SPECIALIST ──────────────────────────────────
+#
+# Source: COMPLIANCE_TOOLS in agents/compliance_agent.py
+# Principle: specialists receive only the tools relevant to their domain (see ADR-001).
+#
+# classify_document  — extracts entities, jurisdiction codes, sensitivity, AML gap flags
+# check_sanctions    — screens one named entity against OFAC-SDN, EU-Consolidated, UN-SC
+#
+# NOT available to Compliance specialist:
+#   route_to_workstream  — routing is coordinator-only; specialist cannot take irreversible actions
+#   escalate_to_human    — escalation decision is coordinator's; specialist signals via WorkstreamAnalysis
+#   lookup_deal_registry — read from deal registry is coordinator's orchestration step, not specialist's
+
+# ── EXPECTED RETURN VALUE ─────────────────────────────────────────────────────
+#
+# Coordinator expects: WorkstreamAnalysis (Pydantic model from orchestrator.py)
+#
+# WorkstreamAnalysis fields and how coordinator uses them:
+#   workstream       — "Compliance" (coordinator validates this matches the spawned specialist)
+#   risk_level       — coordinator uses this for multi-workstream trigger (≥3 at high/critical → escalate)
+#   confidence       — if < 0.65, coordinator escalates regardless of risk_level
+#   rationale        — written to audit log; attached to escalation packet if escalation fires
+#   sanctions_checked — if True AND flags contains "SANCTIONS HIT:", coordinator sets
+#                       session_ctx["sanctions_hits_found"] = True before any route_to_workstream call
+#   flags            — coordinator reads for "SANCTIONS HIT:" prefix to update session_ctx;
+#                       also included verbatim in escalation decision packet
+
+# ── WHAT THE COORDINATOR DOES WITH THE RESULT ─────────────────────────────────
+#
+# 1. If result.sanctions_checked and any flag starts with "SANCTIONS HIT:":
+#       session_ctx["sanctions_hits_found"] = True
+#       → pre_tool_use_hook() will block any subsequent route_to_workstream call (Rule 2)
+#
+# 2. If result.confidence < SPECIALIST_CONFIDENCE_FLOOR (0.65):
+#       coordinator calls escalate_to_human with reason="specialist_inconclusive"
+#
+# 3. If result.risk_level in ("high", "critical"):
+#       coordinator increments its multi-workstream high-risk counter
+#       if counter >= 3: escalate_to_human fires (Rule from config.yaml)
+#
+# 4. result.rationale is appended to reasoning_chain in audit log
+#    regardless of routing outcome — every specialist's reasoning is preserved

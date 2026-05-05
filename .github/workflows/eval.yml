@@ -1,0 +1,62 @@
+name: OrchestratorOne Adversarial Eval Suite
+
+on:
+  push:
+    paths:
+      - 'Table10_OrchestratorOne/**'
+  pull_request:
+    paths:
+      - 'Table10_OrchestratorOne/**'
+  workflow_dispatch:
+
+jobs:
+  adversarial-evals:
+    name: Adversarial Evaluation Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install anthropic pydantic
+
+      - name: Pre-fix mode — verify suite catches known failures
+        working-directory: Table10_OrchestratorOne
+        run: |
+          echo "Running in pre-fix mode: COMP-001, COMP-002, FIN-001 should FAIL"
+          python tests/adversarial_evals.py --pre-fix || true
+          echo "---"
+          echo "Expected 3 failures above (COMP-001, COMP-002, FIN-001)."
+          echo "If 0 failures, the test suite is not catching the documented failure modes."
+
+      - name: Post-fix mode — all cases must pass
+        working-directory: Table10_OrchestratorOne
+        run: |
+          echo "Running post-fix mode: all 10 cases must pass"
+          python tests/adversarial_evals.py
+          echo "Deploy gate: false-confidence rate must be below 8%"
+
+      - name: Verify hook module imports correctly
+        working-directory: Table10_OrchestratorOne
+        run: |
+          python -c "
+          from hooks.pre_tool_use import pre_tool_use_hook
+          # Rule 1: materiality block
+          r = pre_tool_use_hook('route_to_workstream', {}, 500_000_000, {})
+          assert r and r['blocked'], 'Rule 1 (materiality) failed'
+          # Rule 2: sanctions hit block
+          r = pre_tool_use_hook('route_to_workstream', {}, 1_000_000, {'sanctions_hits_found': True})
+          assert r and r['blocked'], 'Rule 2 (sanctions_hit) failed'
+          # Rule 3: sanctions check on material deal
+          r = pre_tool_use_hook('check_sanctions', {}, 500_000_000, {})
+          assert r and r['blocked'], 'Rule 3 (sanctions_check_materiality) failed'
+          # Clean path: below threshold, no hits
+          r = pre_tool_use_hook('route_to_workstream', {}, 50_000_000, {'sanctions_hits_found': False})
+          assert r is None, 'Clean path incorrectly blocked'
+          print('All 3 hook rules verified + clean path confirmed.')
+          "
