@@ -9,6 +9,14 @@ Features:
 - Validation-retry loop (up to 3 retries; error fed back as context)
 - Audit log with full reasoning chain, tool call hashes, and hook events
 
+SDK note:
+    This file uses the raw `anthropic` messages API rather than the claude-agent-sdk
+    `query()` abstraction. The Agent SDK's internal tool loop makes our PreToolUse hook
+    enforcement optional (callback-based) rather than mandatory (synchronous critical path).
+    For compliance-grade blocking — where a sanctions hit or materiality breach must NEVER
+    reach route_to_workstream — the hook must be in the critical path of every tool call.
+    See decisions/ADR-003-raw-api-over-agent-sdk.md for the full tradeoff analysis.
+
 Usage:
     python orchestrator.py --sample [--verbose]
     python orchestrator.py --intake path/to/intake.json [--verbose]
