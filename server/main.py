@@ -2,14 +2,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from pydantic import BaseModel
-from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders
 from datetime import datetime, timedelta
-import uuid
+from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders, restocking_orders
 
 app = FastAPI(title="Factory Inventory Management System")
-
-# In-memory store for submitted restocking orders
-submitted_restocking_orders = []
 
 # Quarter mapping for date filtering
 QUARTER_MAP = {
@@ -124,18 +120,6 @@ class CreatePurchaseOrderRequest(BaseModel):
     unit_cost: float
     expected_delivery_date: str
     notes: Optional[str] = None
-
-class RestockingItem(BaseModel):
-    sku: str
-    name: str
-    quantity: int
-    unit_cost: float
-
-class CreateRestockingOrderRequest(BaseModel):
-    items: List[RestockingItem]
-    warehouse: str
-    category: str
-    total_value: float
 
 # API endpoints
 @app.get("/")
@@ -321,50 +305,43 @@ def get_monthly_trends():
     result.sort(key=lambda x: x['month'])
     return result
 
-@app.post("/api/restocking-orders", response_model=Order)
-def create_restocking_order(request: CreateRestockingOrderRequest):
-    """Create a new restocking order from demand forecast recommendations"""
-    # Generate unique order number
-    order_number = f"ORD-RST-{len(submitted_restocking_orders) + 1:04d}"
+class RestockingOrder(BaseModel):
+    id: str
+    order_number: str
+    items: List[dict]
+    budget: float
+    total_value: float
+    order_date: str
+    expected_delivery: str
+    status: str
 
-    # Create order date and expected delivery (14 days later)
-    order_date = datetime.utcnow().isoformat()
-    expected_delivery = (datetime.utcnow() + timedelta(days=14)).isoformat()
+class CreateRestockingOrderRequest(BaseModel):
+    items: List[dict]
+    budget: float
+    total_value: float
 
-    # Build items list in the format expected by Order model
-    items_list = []
-    for item in request.items:
-        items_list.append({
-            "sku": item.sku,
-            "name": item.name,
-            "quantity": item.quantity,
-            "unit_price": item.unit_cost
-        })
-
-    # Create order dict
+@app.post("/api/restocking-orders", response_model=RestockingOrder)
+def create_restocking_order(body: CreateRestockingOrderRequest):
+    """Create a restocking order from demand-based recommendations"""
+    now = datetime.now()
+    order_number = f"RST-{now.year}-{str(len(restocking_orders) + 1).zfill(4)}"
     new_order = {
-        "id": str(uuid.uuid4()),
+        "id": str(len(restocking_orders) + 1),
         "order_number": order_number,
-        "customer": "Internal Restocking",
-        "items": items_list,
-        "status": "Submitted",
-        "order_date": order_date,
-        "expected_delivery": expected_delivery,
-        "total_value": request.total_value,
-        "warehouse": request.warehouse,
-        "category": request.category
+        "items": body.items,
+        "budget": body.budget,
+        "total_value": round(body.total_value, 2),
+        "order_date": now.isoformat(),
+        "expected_delivery": (now + timedelta(days=14)).isoformat(),
+        "status": "Processing"
     }
-
-    # Add to both the orders list and the restocking-specific list
-    orders.append(new_order)
-    submitted_restocking_orders.append(new_order)
-
+    restocking_orders.append(new_order)
     return new_order
 
-@app.get("/api/restocking-orders", response_model=List[Order])
+@app.get("/api/restocking-orders", response_model=List[RestockingOrder])
 def get_restocking_orders():
     """Get all submitted restocking orders"""
-    return submitted_restocking_orders
+    return restocking_orders
 
 if __name__ == "__main__":
     import uvicorn
