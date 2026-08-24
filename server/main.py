@@ -2,7 +2,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from pydantic import BaseModel
-from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders
+from datetime import datetime, timedelta
+from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders, restocking_orders
 
 app = FastAPI(title="Factory Inventory Management System")
 
@@ -303,6 +304,44 @@ def get_monthly_trends():
     result = list(months.values())
     result.sort(key=lambda x: x['month'])
     return result
+
+class RestockingOrder(BaseModel):
+    id: str
+    order_number: str
+    items: List[dict]
+    budget: float
+    total_value: float
+    order_date: str
+    expected_delivery: str
+    status: str
+
+class CreateRestockingOrderRequest(BaseModel):
+    items: List[dict]
+    budget: float
+    total_value: float
+
+@app.post("/api/restocking-orders", response_model=RestockingOrder)
+def create_restocking_order(body: CreateRestockingOrderRequest):
+    """Create a restocking order from demand-based recommendations"""
+    now = datetime.now()
+    order_number = f"RST-{now.year}-{str(len(restocking_orders) + 1).zfill(4)}"
+    new_order = {
+        "id": str(len(restocking_orders) + 1),
+        "order_number": order_number,
+        "items": body.items,
+        "budget": body.budget,
+        "total_value": round(body.total_value, 2),
+        "order_date": now.isoformat(),
+        "expected_delivery": (now + timedelta(days=14)).isoformat(),
+        "status": "Processing"
+    }
+    restocking_orders.append(new_order)
+    return new_order
+
+@app.get("/api/restocking-orders", response_model=List[RestockingOrder])
+def get_restocking_orders():
+    """Get all submitted restocking orders"""
+    return restocking_orders
 
 if __name__ == "__main__":
     import uvicorn
