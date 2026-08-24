@@ -172,7 +172,7 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { api } from '../api'
 import { useFilters } from '../composables/useFilters'
 import { useI18n } from '../composables/useI18n'
@@ -185,7 +185,7 @@ export default {
     CostDetailModal
   },
   setup() {
-    const { t, currentCurrency, currencySymbol } = useI18n()
+    const { t, currentCurrency, currencySymbol, translateCategory } = useI18n()
     const loading = ref(true)
     const error = ref(null)
     const allMonthlySpending = ref([])
@@ -370,11 +370,6 @@ export default {
       }
     }
 
-    // Watch for period filter changes
-    watch([selectedPeriod], () => {
-      // Data will automatically update via computed properties
-    })
-
     const formatCurrency = (value) => {
       return formatCurrencyUtil(value, currentCurrency.value)
     }
@@ -420,27 +415,6 @@ export default {
         'Dec': t('months.dec')
       }
       return monthMap[month] || month
-    }
-
-    const translateCategory = (category) => {
-      // First try spending categories
-      const spendingCategoryMap = {
-        'Raw Materials': t('spendingCategories.rawMaterials'),
-        'Components': t('spendingCategories.components'),
-        'Equipment': t('spendingCategories.equipment'),
-        'Consumables': t('spendingCategories.consumables')
-      }
-
-      // Then try product categories
-      const productCategoryMap = {
-        'Circuit Boards': t('categories.circuitBoards'),
-        'Sensors': t('categories.sensors'),
-        'Actuators': t('categories.actuators'),
-        'Controllers': t('categories.controllers'),
-        'Power Supplies': t('categories.powerSupplies')
-      }
-
-      return spendingCategoryMap[category] || productCategoryMap[category] || category
     }
 
     const handleTransactionClick = (transaction) => {

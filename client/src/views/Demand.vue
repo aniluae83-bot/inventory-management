@@ -119,7 +119,7 @@ import { useI18n } from '../composables/useI18n'
 export default {
   name: 'Demand',
   setup() {
-    const { t } = useI18n()
+    const { t, currentLocale } = useI18n()
     const loading = ref(true)
     const error = ref(null)
     const allForecasts = ref([])
@@ -190,8 +190,6 @@ export default {
     }
 
     const translatePeriod = (period) => {
-      // Period values like "Next 3 months", "Q1 2025", "30 days", etc.
-      const { currentLocale } = useI18n()
       if (currentLocale.value === 'ja') {
         return period
           .replace(/Next\s+/i, '次の')

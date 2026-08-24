@@ -35,7 +35,7 @@
                   <details class="items-details">
                     <summary class="items-summary">{{ order.items.length }} item{{ order.items.length !== 1 ? 's' : '' }}</summary>
                     <div class="items-dropdown">
-                      <div v-for="(item, idx) in order.items" :key="idx" class="item-entry">
+                      <div v-for="item in order.items" :key="item.sku" class="item-entry">
                         <span class="item-name">{{ item.name }}</span>
                         <span class="item-meta">Qty: {{ item.quantity.toLocaleString() }} @ ${{ item.unit_cost.toFixed(2) }}</span>
                       </div>
@@ -56,19 +56,19 @@
       <div class="stats-grid">
         <div class="stat-card success">
           <div class="stat-label">{{ t('status.delivered') }}</div>
-          <div class="stat-value">{{ getOrdersByStatus('Delivered').length }}</div>
+          <div class="stat-value">{{ deliveredOrders.length }}</div>
         </div>
         <div class="stat-card info">
           <div class="stat-label">{{ t('status.shipped') }}</div>
-          <div class="stat-value">{{ getOrdersByStatus('Shipped').length }}</div>
+          <div class="stat-value">{{ shippedOrders.length }}</div>
         </div>
         <div class="stat-card warning">
           <div class="stat-label">{{ t('status.processing') }}</div>
-          <div class="stat-value">{{ getOrdersByStatus('Processing').length }}</div>
+          <div class="stat-value">{{ processingOrders.length }}</div>
         </div>
         <div class="stat-card danger">
           <div class="stat-label">{{ t('status.backordered') }}</div>
-          <div class="stat-value">{{ getOrdersByStatus('Backordered').length }}</div>
+          <div class="stat-value">{{ backorderedOrders.length }}</div>
         </div>
       </div>
 
@@ -99,7 +99,7 @@
                       {{ t('orders.itemsCount', { count: order.items.length }) }}
                     </summary>
                     <div class="items-dropdown">
-                      <div v-for="(item, idx) in order.items" :key="idx" class="item-entry">
+                      <div v-for="item in order.items" :key="item.sku" class="item-entry">
                         <span class="item-name">{{ translateProductName(item.name) }}</span>
                         <span class="item-meta">{{ t('orders.quantity') }}: {{ item.quantity }} @ {{ currencySymbol }}{{ item.unit_price }}</span>
                       </div>
@@ -132,11 +132,7 @@ import { useI18n } from '../composables/useI18n'
 export default {
   name: 'Orders',
   setup() {
-    const { t, currentCurrency, translateProductName, translateCustomerName } = useI18n()
-
-    const currencySymbol = computed(() => {
-      return currentCurrency.value === 'JPY' ? '¥' : '$'
-    })
+    const { t, currentCurrency, currentLocale, currencySymbol, translateProductName, translateCustomerName } = useI18n()
     const loading = ref(true)
     const error = ref(null)
     const orders = ref([])
@@ -183,9 +179,10 @@ export default {
       loadOrders()
     })
 
-    const getOrdersByStatus = (status) => {
-      return orders.value.filter(order => order.status === status)
-    }
+    const deliveredOrders   = computed(() => orders.value.filter(o => o.status === 'Delivered'))
+    const shippedOrders     = computed(() => orders.value.filter(o => o.status === 'Shipped'))
+    const processingOrders  = computed(() => orders.value.filter(o => o.status === 'Processing'))
+    const backorderedOrders = computed(() => orders.value.filter(o => o.status === 'Backordered'))
 
     const getOrderStatusClass = (status) => {
       const statusMap = {
@@ -198,7 +195,6 @@ export default {
     }
 
     const formatDate = (dateString) => {
-      const { currentLocale } = useI18n()
       const locale = currentLocale.value === 'ja' ? 'ja-JP' : 'en-US'
       return new Date(dateString).toLocaleDateString(locale, {
         year: 'numeric',
@@ -218,7 +214,10 @@ export default {
       error,
       orders,
       restockingOrders,
-      getOrdersByStatus,
+      deliveredOrders,
+      shippedOrders,
+      processingOrders,
+      backorderedOrders,
       getOrderStatusClass,
       formatDate,
       currencySymbol,
